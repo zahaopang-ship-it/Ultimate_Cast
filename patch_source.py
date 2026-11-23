@@ -140,6 +140,10 @@ object Dial {
     }
 }
 ''', encoding="utf-8")
+dial_source = dial.read_text(encoding="utf-8")
+dial_source = dial_source.replace(r"\\r\\n", r"\r\n")
+dial_source = dial_source.replace(r"\\\\s", r"\\s").replace(r"\\\\r", r"\\r").replace(r"\\\\n", r"\\n")
+dial.write_text(dial_source, encoding="utf-8")
 
 activity = Path("app/src/main/java/com/example/screencast/MainActivity.kt")
 source = activity.read_text(encoding="utf-8")
