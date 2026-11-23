@@ -185,3 +185,14 @@ for p in Path(".").rglob("*"):
                 if j not in shown:
                     print(f"{j+1}: {lines[j]}")
                     shown.add(j)
+
+# Dump the WebRTC-only implementation for a targeted low-latency patch.
+for name in [
+    "app/src/main/java/com/example/screencast/WebRtcTransport.kt",
+    "app/src/main/java/com/example/screencast/LiveServer.kt",
+    "app/src/main/java/com/example/screencast/WebRtcProjectionCapturer.kt",
+]:
+    p = Path(name)
+    print("\n=== FULL SOURCE", name, "===")
+    for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        print(f"{n}: {line}")
