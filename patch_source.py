@@ -80,10 +80,10 @@ object Dial {
         val found = linkedSetOf<String>()
         DatagramSocket().use { socket ->
             socket.soTimeout = 700
-            val query = ("M-SEARCH * HTTP/1.1\\r\\n" +
-                "HOST: 239.255.255.250:1900\\r\\n" +
-                "MAN: \\"ssdp:discover\\"\\r\\n" +
-                "MX: 2\\r\\nST: $DIAL_ST\\r\\n\\r\\n").toByteArray()
+            val query = ("M-SEARCH * HTTP/1.1\r\n" +
+                "HOST: 239.255.255.250:1900\r\n" +
+                "MAN: \"ssdp:discover\"\r\n" +
+                "MX: 2\r\nST: $DIAL_ST\r\n\r\n").toByteArray()
             socket.send(DatagramPacket(query, query.size, InetAddress.getByName("239.255.255.250"), 1900))
             val deadline = System.currentTimeMillis() + 3500
             val buffer = ByteArray(4096)
@@ -92,7 +92,7 @@ object Dial {
                     val packet = DatagramPacket(buffer, buffer.size)
                     socket.receive(packet)
                     val response = String(packet.data, 0, packet.length, Charsets.UTF_8)
-                    val location = Regex("(?im)^location:\\\\s*(https?://[^\\\\r\\\\n]+)")
+                    val location = Regex("(?im)^location:\\s*(https?://[^\\r\\n]+)")
                         .find(response)?.groupValues?.get(1)?.trim() ?: continue
                     if (runCatching { URL(location).host.equals(targetHost, true) }.getOrDefault(false)) {
                         found.add(location)
