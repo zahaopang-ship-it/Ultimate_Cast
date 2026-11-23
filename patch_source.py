@@ -271,9 +271,13 @@ live.write_text(source, encoding="utf-8")
 # Bump version while retaining the original 2.1.2 source archive as the build base.
 gradle = Path("app/build.gradle.kts")
 source = gradle.read_text(encoding="utf-8")
-if 'versionCode = 6' not in source or 'versionName = "2.1.2"' not in source:
+if 'versionCode = 6' in source and 'versionName = "2.1.2"' in source:
+    source = source.replace('versionCode = 6', 'versionCode = 9', 1)
+    source = source.replace('versionName = "2.1.2"', 'versionName = "2.1.5"', 1)
+elif 'versionCode = 8' in source and 'versionName = "2.1.4"' in source:
+    source = source.replace('versionCode = 8', 'versionCode = 9', 1)
+    source = source.replace('versionName = "2.1.4"', 'versionName = "2.1.5"', 1)
+elif not ('versionCode = 9' in source and 'versionName = "2.1.5"' in source):
     raise SystemExit("Unexpected base version; refusing release version patch.")
-source = source.replace('versionCode = 6', 'versionCode = 9', 1)
-source = source.replace('versionName = "2.1.2"', 'versionName = "2.1.5"', 1)
 gradle.write_text(source, encoding="utf-8")
 print("Applied 2.1.5 WebRTC local-network and low-latency tuning. MSE implementation left unchanged.")
