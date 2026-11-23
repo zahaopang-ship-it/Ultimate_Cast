@@ -28,7 +28,7 @@ if old not in source:
     raise SystemExit("Expected WebRTC/DLNA block not found; refusing partial patch.")
 source = source.replace(old, new, 1)
 old_stop = "        controlUrl?.let { runBlocking(Dispatchers.IO) { withTimeoutOrNull(1500) { Dlna.stop(it) } } }"
-new_stop = "        if (sessionConfig.transport == \\"MSE\\") controlUrl?.let { runBlocking(Dispatchers.IO) { withTimeoutOrNull(1500) { Dlna.stop(it) } } }"
+new_stop = '        if (sessionConfig.transport == "MSE") controlUrl?.let { runBlocking(Dispatchers.IO) { withTimeoutOrNull(1500) { Dlna.stop(it) } } }'
 if old_stop not in source:
     raise SystemExit("Expected shutdown block not found; refusing partial patch.")
 source = source.replace(old_stop, new_stop, 1)
