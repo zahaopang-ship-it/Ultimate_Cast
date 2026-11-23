@@ -281,3 +281,67 @@ elif not ('versionCode = 9' in source and 'versionName = "2.1.5"' in source):
     raise SystemExit("Unexpected base version; refusing release version patch.")
 gradle.write_text(source, encoding="utf-8")
 print("Applied 2.1.5 WebRTC local-network and low-latency tuning. MSE implementation left unchanged.")
+
+
+# Safe VIDAA local-control preflight. This does not send MQTT commands or bypass TLS.
+# It only checks whether the TV exposes the documented local broker before adding
+# any credential/pairing implementation. MSE code remains untouched.
+probe = Path("app/src/main/java/com/example/screencast/VidaaLocalProbe.kt")
+probe.write_text(r'''package com.example.screencast
+
+import java.net.InetSocketAddress
+import java.net.Socket
+
+object VidaaLocalProbe {
+    /** True only when the TV accepts a TCP connection on its local VIDAA MQTT port. */
+    fun isBrokerReachable(host: String, timeoutMs: Int = 1200): Boolean {
+        return runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, 36669), timeoutMs)
+                socket.isConnected
+            }
+        }.getOrDefault(false)
+    }
+}
+''', encoding="utf-8")
+
+service = Path("app/src/main/java/com/example/screencast/MediaProjectionService.kt")
+source = service.read_text(encoding="utf-8")
+old = '''                StreamState.transportStatus.value = if (launched) {
+                    "WebRTC receiver opened on TV · accept the connection there"
+                } else {
+                    "WebRTC ready · TV browser launch unavailable; open the link in its browser"
+                }'''
+new = '''                val vidaaBroker = !launched && selectedHost != null &&
+                    runCatching { VidaaLocalProbe.isBrokerReachable(selectedHost) }.getOrDefault(false)
+                StreamState.transportStatus.value = when {
+                    launched -> "WebRTC receiver opened on TV · accept the connection there"
+                    vidaaBroker -> "VIDAA local control detected · secure pairing/launch integration is next"
+                    else -> "WebRTC ready · TV browser launch unavailable; open the link in its browser"
+                }'''
+if source.count(old) != 1:
+    raise SystemExit("Expected WebRTC DIAL status block not found exactly once; refusing patch.")
+source = source.replace(old, new, 1)
+service.write_text(source, encoding="utf-8")
+
+# DIAL discovery requires Android's multicast permission; this is limited to local discovery.
+manifest = Path("app/src/main/AndroidManifest.xml")
+xml = manifest.read_text(encoding="utf-8")
+permission = '<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />'
+if permission not in xml:
+    m = re.search(r'<manifest\b[^>]*>', xml)
+    if not m:
+        raise SystemExit("Android manifest root not found; refusing permission patch.")
+    xml = xml[:m.end()] + "\n    " + permission + xml[m.end():]
+manifest.write_text(xml, encoding="utf-8")
+
+# Increment app version for the diagnostic build.
+gradle = Path("app/build.gradle.kts")
+source = gradle.read_text(encoding="utf-8")
+if 'versionCode = 9' in source and 'versionName = "2.1.5"' in source:
+    source = source.replace('versionCode = 9', 'versionCode = 10', 1)
+    source = source.replace('versionName = "2.1.5"', 'versionName = "2.1.6"', 1)
+elif not ('versionCode = 10' in source and 'versionName = "2.1.6"' in source):
+    raise SystemExit("Unexpected app version before 2.1.6 bump; refusing patch.")
+gradle.write_text(source, encoding="utf-8")
+print("Applied 2.1.6 VIDAA local-broker preflight. No MQTT credentials or commands added; MSE unchanged.")
