@@ -196,3 +196,84 @@ for name in [
     print("\n=== FULL SOURCE", name, "===")
     for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
         print(f"{n}: {line}")
+
+
+# WebRTC-only low-latency tuning. MSE code paths and MSE HTML are intentionally untouched.
+webrtc = Path("app/src/main/java/com/example/screencast/WebRtcTransport.kt")
+source = webrtc.read_text(encoding="utf-8")
+
+def replace_once(text, old, new, label):
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"Expected exactly one {label} target, found {count}; refusing build.")
+    return text.replace(old, new, 1)
+
+source = replace_once(
+    source,
+    'source = factory!!.createVideoSource(false)',
+    'source = factory!!.createVideoSource(true)',
+    "WebRTC screen-content source mode"
+)
+source = replace_once(
+    source,
+    'val ice = listOf(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())',
+    'val ice = emptyList<PeerConnection.IceServer>() // Same-LAN casting: host ICE candidates only; no Internet STUN dependency.',
+    "WebRTC local-only ICE configuration"
+)
+source = replace_once(
+    source,
+    'val dcInit = DataChannel.Init().apply { ordered = true }',
+    'val dcInit = DataChannel.Init().apply { ordered = false; maxRetransmits = 0 }',
+    "WebRTC real-time audio data channel"
+)
+source = replace_once(
+    source,
+    'setBufferSizeInBytes(maxOf(minBuffer * 4, 32_768))',
+    'setBufferSizeInBytes(maxOf(minBuffer, 8_192))',
+    "WebRTC playback audio capture buffer"
+)
+source = replace_once(
+    source,
+    'channel.bufferedAmount() < 256_000',
+    'channel.bufferedAmount() < 12_000',
+    "WebRTC audio queue ceiling"
+)
+webrtc.write_text(source, encoding="utf-8")
+
+live = Path("app/src/main/java/com/example/screencast/LiveServer.kt")
+source = live.read_text(encoding="utf-8")
+source = replace_once(
+    source,
+    "pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});",
+    "pc=new RTCPeerConnection({iceServers:[],bundlePolicy:'max-bundle',rtcpMuxPolicy:'require'});",
+    "WebRTC receiver local-only ICE configuration"
+)
+source = replace_once(
+    source,
+    "audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000});",
+    "audioCtx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000,latencyHint:'interactive'});",
+    "WebRTC interactive audio output"
+)
+source = replace_once(
+    source,
+    "pc.ontrack=e=>{video.srcObject=e.streams[0];video.play().catch(()=>{});status.textContent='Connected · WebRTC';};",
+    "pc.ontrack=e=>{try{e.receiver.playoutDelayHint=0;}catch(_){}try{e.receiver.jitterBufferTarget=0;}catch(_){}video.srcObject=e.streams[0];video.play().catch(()=>{});status.textContent='Connected · WebRTC';};",
+    "WebRTC minimum receiver playout buffering"
+)
+source = replace_once(
+    source,
+    "const now=audioCtx.currentTime;if(nextAudioTime<now+0.025||nextAudioTime>now+0.25)nextAudioTime=now+0.06;",
+    "const now=audioCtx.currentTime;if(nextAudioTime<now+0.01||nextAudioTime>now+0.10)nextAudioTime=now+0.02;",
+    "WebRTC audio scheduling horizon"
+)
+live.write_text(source, encoding="utf-8")
+
+# Bump version while retaining the original 2.1.2 source archive as the build base.
+gradle = Path("app/build.gradle.kts")
+source = gradle.read_text(encoding="utf-8")
+if 'versionCode = 6' not in source or 'versionName = "2.1.2"' not in source:
+    raise SystemExit("Unexpected base version; refusing release version patch.")
+source = source.replace('versionCode = 6', 'versionCode = 9', 1)
+source = source.replace('versionName = "2.1.2"', 'versionName = "2.1.5"', 1)
+gradle.write_text(source, encoding="utf-8")
+print("Applied 2.1.5 WebRTC local-network and low-latency tuning. MSE implementation left unchanged.")
