@@ -7,7 +7,7 @@ old = """            // Reuse the existing DLNA renderer selection to open the W
             controlUrl?.let { rendererUrl ->
                 scope.launch {
                     runCatching { Dlna.play(rendererUrl, webRtcUrl) }
-                        .onFailure { StreamState.transportStatus.value = "WebRTC ready · open TV link manually (\${it.message})" }
+                        .onFailure { StreamState.transportStatus.value = "WebRTC ready · open TV link manually (${it.message})" }
                 }
             }
 """
