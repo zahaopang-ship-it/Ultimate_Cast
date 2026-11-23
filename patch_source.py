@@ -163,3 +163,25 @@ source = source.replace('versionCode = 6', 'versionCode = 8', 1)
 source = source.replace('versionName = "2.1.2"', 'versionName = "2.1.4"', 1)
 gradle.write_text(source, encoding="utf-8")
 print("Applied 2.1.4 DIAL browser-launch attempt. MSE implementation left unchanged.")
+
+
+# Temporary source audit for WebRTC low-latency tuning and VIDAA permissions.
+import re
+for p in Path(".").rglob("*"):
+    if not p.is_file() or p.suffix.lower() not in {".kt", ".java", ".html", ".js", ".xml", ".gradle", ".kts"}:
+        continue
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        continue
+    hits = [i for i, line in enumerate(lines) if re.search(
+        r"webrtc|jitter|buffer|latency|bitrate|framerate|frame.?rate|key.?frame|icecandidate|peerconnection|videocapturer|CHANGE_WIFI_MULTICAST_STATE|uses-permission",
+        line, re.I)]
+    if hits:
+        print("\n=== AUDIT", p, "===")
+        shown = set()
+        for i in hits:
+            for j in range(max(0, i-2), min(len(lines), i+3)):
+                if j not in shown:
+                    print(f"{j+1}: {lines[j]}")
+                    shown.add(j)
